@@ -41,12 +41,12 @@ function createDefaultSession(): GameSession {
   });
 
   return {
-    id: `session-${Date.now()}`,
+    id: 'default-session',
     quiz: SAMPLE_QUIZ,
     teams: defaultTeams,
     cardStates: initialCardStates,
     scoreHistory: [],
-    lastUpdated: Date.now(),
+    lastUpdated: 0,
   };
 }
 
@@ -67,24 +67,14 @@ export default function HostPage() {
   const router = useRouter();
   const [, startTransition] = useTransition();
 
-  // Lazy state initializers (Vercel React best practice)
-  const [session, setSession] = useState<GameSession>(() => {
-    const loaded = loadSessionFromLocalStorage();
-    if (loaded && loaded.quiz) return loaded;
-    return createDefaultSession();
-  });
-
-  const [currentCommand, setCurrentCommand] = useState<DisplayCommand>(() => {
-    const lastCmd = loadLastDisplayCommand();
-    if (lastCmd) return lastCmd;
-    const loaded = loadSessionFromLocalStorage() || createDefaultSession();
-    return {
-      type: 'SHOW_BOARD',
-      segments: extractDisplaySegments(loaded.quiz),
-      cardStates: loaded.cardStates,
-      teams: loaded.teams,
-    };
-  });
+  const [isMounted, setIsMounted] = useState(false);
+  const [session, setSession] = useState<GameSession>(createDefaultSession);
+  const [currentCommand, setCurrentCommand] = useState<DisplayCommand>(() => ({
+    type: 'SHOW_BOARD',
+    segments: extractDisplaySegments(SAMPLE_QUIZ),
+    cardStates: {},
+    teams: [],
+  }));
 
   const [isMuted, setIsMuted] = useState(false);
 
@@ -103,6 +93,35 @@ export default function HostPage() {
     bus.sendCommand(cmd);
   }, []);
 
+  // Hydrate from localStorage on client mount
+  useEffect(() => {
+    const loaded = loadSessionFromLocalStorage();
+    if (loaded && loaded.quiz) {
+      setSession(loaded);
+      const lastCmd = loadLastDisplayCommand();
+      if (lastCmd) {
+        setCurrentCommand(lastCmd);
+      } else {
+        setCurrentCommand({
+          type: 'SHOW_BOARD',
+          segments: extractDisplaySegments(loaded.quiz),
+          cardStates: loaded.cardStates,
+          teams: loaded.teams,
+        });
+      }
+    } else {
+      const def = createDefaultSession();
+      setSession(def);
+      setCurrentCommand({
+        type: 'SHOW_BOARD',
+        segments: extractDisplaySegments(def.quiz),
+        cardStates: def.cardStates,
+        teams: def.teams,
+      });
+    }
+    setIsMounted(true);
+  }, []);
+
   // SyncBus listener & responder
   useEffect(() => {
     const bus = getSyncBus();
@@ -117,10 +136,11 @@ export default function HostPage() {
     };
   }, [currentCommand]);
 
-  // Persist session whenever it changes
+  // Persist session whenever it changes, but ONLY after initial client mount has completed
   useEffect(() => {
+    if (!isMounted) return;
     saveSessionToLocalStorage(session);
-  }, [session]);
+  }, [session, isMounted]);
 
   // Audio mute toggle
   function handleToggleMute() {
@@ -308,6 +328,17 @@ export default function HostPage() {
   const totalCards = session.quiz.segments.reduce((acc, s) => acc + s.questions.length, 0);
   const disabledCardsCount = Object.values(session.cardStates).filter((s) => s === 'DISABLED').length;
   const isAllCardsFinished = totalCards > 0 && disabledCardsCount === totalCards;
+
+  if (!isMounted) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-zinc-950 text-zinc-100">
+        <div className="flex items-center gap-3 text-amber-400 font-mono text-sm animate-pulse">
+          <span className="size-2.5 rounded-full bg-amber-400 animate-ping" />
+          <span>LOADING HOST CONTROLLER...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-zinc-950 text-zinc-100 selection:bg-amber-500/30">

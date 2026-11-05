@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Quiz, TeamScore, CardStatus, GameSession } from '@/types/quiz';
 import { SAMPLE_QUIZ } from '@/lib/sample-quiz';
@@ -50,11 +50,15 @@ export default function LobbyPage() {
   ]);
   const [newTeamName, setNewTeamName] = useState('');
 
-  // Hydrate previous session using lazy state initialization (Vercel best practice)
-  const [hasExistingSession] = useState(() => {
+  // Hydrate previous session in useEffect to prevent server/client hydration mismatch
+  const [hasExistingSession, setHasExistingSession] = useState(false);
+
+  useEffect(() => {
     const existing = loadSessionFromLocalStorage();
-    return Boolean(existing && existing.quiz);
-  });
+    if (existing && existing.quiz) {
+      setHasExistingSession(true);
+    }
+  }, []);
 
   function resumeExistingSession() {
     router.push('/host');

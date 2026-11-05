@@ -31,39 +31,18 @@ interface BoardData {
 }
 
 export default function ScreenPage() {
-  const [command, setCommand] = useState<DisplayCommand | null>(() => loadLastDisplayCommand());
+  const [isMounted, setIsMounted] = useState(false);
+  const [command, setCommand] = useState<DisplayCommand | null>(null);
   const [revealedClues, setRevealedClues] = useState<{ index: number; text: string }[]>([]);
   const [revealedAnswer, setRevealedAnswer] = useState<{ answer: string; explanation?: string } | undefined>(undefined);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  const [activeQuestion, setActiveQuestion] = useState<ActiveQuestionData | null>(() => {
-    const cached = loadLastDisplayCommand();
-    if (cached && cached.type === 'SHOW_QUESTION') {
-      return {
-        segmentTitle: cached.segmentTitle,
-        cardIndex: cached.cardIndex,
-        totalInSegment: cached.totalInSegment,
-        prompt: cached.prompt,
-        questionType: cached.questionType,
-        media: cached.media,
-        pointsRight: cached.pointsRight,
-        pointsWrong: cached.pointsWrong,
-        clueCount: cached.clueCount,
-      };
-    }
-    return null;
-  });
+  const [activeQuestion, setActiveQuestion] = useState<ActiveQuestionData | null>(null);
 
-  const [boardData, setBoardData] = useState<BoardData>(() => {
-    const cached = loadLastDisplayCommand();
-    if (cached && cached.type === 'SHOW_BOARD') {
-      return {
-        segments: cached.segments,
-        cardStates: cached.cardStates,
-        teams: cached.teams,
-      };
-    }
-    return { segments: [], cardStates: {}, teams: [] };
+  const [boardData, setBoardData] = useState<BoardData>({
+    segments: [],
+    cardStates: {},
+    teams: [],
   });
 
   const handleIncomingCommand = useCallback((cmd: DisplayCommand) => {
@@ -121,6 +100,12 @@ export default function ScreenPage() {
   }, []);
 
   useEffect(() => {
+    setIsMounted(true);
+    const cached = loadLastDisplayCommand();
+    if (cached) {
+      handleIncomingCommand(cached);
+    }
+
     const bus = getSyncBus();
     const unsubscribe = bus.subscribe((msg) => {
       if (msg.kind === 'COMMAND') {
@@ -145,6 +130,14 @@ export default function ScreenPage() {
       document.exitFullscreen().catch(() => {});
       setIsFullscreen(false);
     }
+  }
+
+  if (!isMounted) {
+    return (
+      <div className="relative min-h-screen w-full bg-[#070709] select-none">
+        <ScreenCurtain />
+      </div>
+    );
   }
 
   return (
