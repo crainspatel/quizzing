@@ -236,6 +236,18 @@ export function HostActiveQuestion({
               {qna.prompt}
             </h2>
 
+            {/* Media Image Preview for Host */}
+            {qna.media && (
+              <div className="mt-3 flex justify-center max-h-56 rounded-xl overflow-hidden border border-zinc-800 bg-zinc-950/80 p-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={qna.media}
+                  alt={qna.prompt}
+                  className="object-contain max-h-52 w-auto rounded-lg mx-auto"
+                />
+              </div>
+            )}
+
             {/* TV Push Trigger */}
             <div className="mt-4 pt-4 border-t border-zinc-800/80 flex items-center justify-between">
               <div className="flex items-center gap-2 text-xs font-mono">

@@ -27,23 +27,23 @@ function getTypeIcon(type: QuestionType) {
 
 export function ScreenBoard({ segments, cardStates }: ScreenBoardProps) {
   return (
-    <div className="relative flex flex-col min-h-screen w-full bg-[#08080a] text-zinc-100 p-6 md:p-10 select-none overflow-hidden justify-between">
+    <div className="relative flex flex-col min-h-screen w-full bg-[#08080a] text-zinc-100 p-4 md:p-8 select-none justify-between overflow-x-auto">
       {/* Background ambient lighting */}
       <div className="absolute top-0 left-1/4 size-[600px] bg-amber-500/5 rounded-full blur-[140px] pointer-events-none" />
       <div className="absolute bottom-0 right-1/4 size-[600px] bg-orange-600/5 rounded-full blur-[140px] pointer-events-none" />
 
       {/* Top Header Bar */}
-      <header className="relative z-10 flex items-center justify-between border-b border-zinc-800/80 pb-5">
+      <header className="relative z-10 flex items-center justify-between border-b border-zinc-800/80 pb-4 mb-4 shrink-0">
         <div className="flex items-center gap-3">
           <div className="size-3 rounded-full bg-amber-400 shadow-[0_0_12px_#f59e0b]" />
-          <h1 className="text-3xl md:text-4xl font-black tracking-tight text-white font-sans">
+          <h1 className="text-2xl md:text-3xl font-black tracking-tight text-white font-sans">
             KWIZZ<span className="text-amber-400">ING</span> BOARD
           </h1>
         </div>
 
         <div className="flex items-center gap-4">
-          <Badge variant="outline" className="px-4 py-1.5 text-sm font-medium border-zinc-700 bg-zinc-900/90 text-zinc-300">
-            <Tv className="size-4 mr-2 text-amber-400 inline" />
+          <Badge variant="outline" className="px-3 py-1 text-xs md:text-sm font-medium border-zinc-700 bg-zinc-900/90 text-zinc-300">
+            <Tv className="size-3.5 mr-1.5 text-amber-400 inline" />
             Live TV Display
           </Badge>
           <div className="text-xs text-zinc-500 font-mono hidden sm:block">
@@ -53,11 +53,11 @@ export function ScreenBoard({ segments, cardStates }: ScreenBoardProps) {
       </header>
 
       {/* Main Grid Section */}
-      <main className="relative z-10 my-auto py-6">
+      <main className="relative z-10 my-auto py-2 w-full overflow-x-auto pb-6">
         <div
-          className="grid gap-5 md:gap-6 w-full"
+          className="grid gap-3 md:gap-4 min-w-full"
           style={{
-            gridTemplateColumns: `repeat(${Math.max(segments.length, 1)}, minmax(0, 1fr))`,
+            gridTemplateColumns: `repeat(${Math.max(segments.length, 1)}, minmax(180px, 1fr))`,
           }}
         >
           {segments.map((segment) => (

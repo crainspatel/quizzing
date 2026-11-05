@@ -29,9 +29,9 @@ import { Trophy } from 'lucide-react';
 
 function createDefaultSession(): GameSession {
   const defaultTeams: TeamScore[] = [
-    { name: 'Diwali Dynamos', score: 0 },
-    { name: 'Patakha Paltan', score: 0 },
-    { name: 'Rocket Rascals', score: 0 },
+    { name: 'Quiz Wizards', score: 0 },
+    { name: 'Lateral Thinkers', score: 0 },
+    { name: 'Buzzing Bees', score: 0 },
   ];
   const initialCardStates: Record<string, CardStatus> = {};
   SAMPLE_QUIZ.segments.forEach((s) => {

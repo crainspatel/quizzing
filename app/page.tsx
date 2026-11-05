@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Quiz, TeamScore, CardStatus, GameSession } from '@/types/quiz';
-import { SAMPLE_QUIZ } from '@/lib/sample-quiz';
+import { SAMPLE_QUIZ, SAMPLE_FESTIVE_QUIZ } from '@/lib/sample-quiz';
 import { parseQuizCSV, generateTemplateCSV, exportQuizToCSV } from '@/lib/csv';
 import {
   saveSessionToLocalStorage,
@@ -44,9 +44,9 @@ export default function LobbyPage() {
 
   // Teams state
   const [teams, setTeams] = useState<string[]>([
-    'Diwali Dynamos 🪔',
-    'Patakha Paltan 🎆',
-    'Rocket Rascals 🚀',
+    'Quiz Wizards 🧙‍♂️',
+    'Lateral Thinkers 💡',
+    'Buzzing Bees 🐝',
   ]);
   const [newTeamName, setNewTeamName] = useState('');
 
@@ -278,8 +278,8 @@ export default function LobbyPage() {
 
           <CardContent className="flex flex-col gap-6">
             {/* Option Pills */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Preset Deck */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Preset Deck: Buzzing with Kvizzing */}
               <div
                 onClick={() => {
                   setQuiz(SAMPLE_QUIZ);
@@ -287,25 +287,62 @@ export default function LobbyPage() {
                   setCsvErrors([]);
                   setImportedFileName(null);
                 }}
-                className={`p-5 rounded-2xl border cursor-pointer transition-all ${
-                  isSampleSelected
+                className={`p-5 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between ${
+                  isSampleSelected && quiz.id === SAMPLE_QUIZ.id
                     ? 'border-amber-400 bg-amber-950/20 ring-2 ring-amber-400/40 shadow-lg'
                     : 'border-zinc-800 hover:border-zinc-700 bg-zinc-950/50'
                 }`}
               >
-                <div className="flex items-center justify-between mb-2">
-                  <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/40 text-xs font-semibold">
-                    Preloaded Ready-to-Play
-                  </Badge>
-                  {isSampleSelected && <CheckCircle2 className="size-4 text-amber-400" />}
-                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/40 text-xs font-semibold">
+                      Default Grand Deck
+                    </Badge>
+                    {isSampleSelected && quiz.id === SAMPLE_QUIZ.id && (
+                      <CheckCircle2 className="size-4 text-amber-400" />
+                    )}
+                  </div>
 
-                <h3 className="font-bold text-lg text-white mb-1">
-                  {SAMPLE_QUIZ.title}
-                </h3>
-                <p className="text-xs text-zinc-400 leading-relaxed">
-                  4 Segments (Bollywood Connects, Sports Champions, Diwali Festivities, Science Curiosities) • 12 lateral questions with progressive clues.
-                </p>
+                  <h3 className="font-bold text-lg text-white mb-1">
+                    {SAMPLE_QUIZ.title}
+                  </h3>
+                  <p className="text-xs text-zinc-400 leading-relaxed">
+                    11 Rounds (Logos, Mergers, Case Bizarre, Cinema Posters, Addresses, Wordplay, Spices, Headlines) • 55 Cards.
+                  </p>
+                </div>
+              </div>
+
+              {/* Preset Deck: Festive Pub Quiz */}
+              <div
+                onClick={() => {
+                  setQuiz(SAMPLE_FESTIVE_QUIZ);
+                  setIsSampleSelected(true);
+                  setCsvErrors([]);
+                  setImportedFileName(null);
+                }}
+                className={`p-5 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between ${
+                  isSampleSelected && quiz.id === SAMPLE_FESTIVE_QUIZ.id
+                    ? 'border-amber-400 bg-amber-950/20 ring-2 ring-amber-400/40 shadow-lg'
+                    : 'border-zinc-800 hover:border-zinc-700 bg-zinc-950/50'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <Badge variant="outline" className="border-zinc-700 text-zinc-300 text-xs font-semibold">
+                      Festive Quick Deck
+                    </Badge>
+                    {isSampleSelected && quiz.id === SAMPLE_FESTIVE_QUIZ.id && (
+                      <CheckCircle2 className="size-4 text-amber-400" />
+                    )}
+                  </div>
+
+                  <h3 className="font-bold text-lg text-white mb-1">
+                    {SAMPLE_FESTIVE_QUIZ.title}
+                  </h3>
+                  <p className="text-xs text-zinc-400 leading-relaxed">
+                    4 Segments (Bollywood Connects, Sports, Diwali Traditions, Science Curiosities) • 12 Questions.
+                  </p>
+                </div>
               </div>
 
               {/* Upload Custom CSV */}
