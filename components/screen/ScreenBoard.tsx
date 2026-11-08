@@ -1,143 +1,84 @@
 'use client';
 
 import React from 'react';
-import { CardStatus, DisplaySegmentInfo, QuestionType, TeamScore } from '@/types/quiz';
-import { Search, Image as ImageIcon, HelpCircle, Link as LinkIcon, Tv, Trophy } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { CardStatus, DisplaySegmentInfo } from '@/types/quiz';
 
 interface ScreenBoardProps {
   segments: DisplaySegmentInfo[];
   cardStates: Record<string, CardStatus>;
-  teams: TeamScore[];
+  boardNumber: number;
 }
 
-function getTypeIcon(type: QuestionType) {
-  switch (type) {
-    case 'CLUE_BASED':
-      return <Search className="size-5 text-amber-400" aria-label="Clue-based" />;
-    case 'IMAGE_BASED':
-      return <ImageIcon className="size-5 text-purple-400" aria-label="Image-based" />;
-    case 'CONNECT':
-      return <LinkIcon className="size-5 text-sky-400" aria-label="Connect" />;
-    case 'STANDARD':
-    default:
-      return <HelpCircle className="size-5 text-emerald-400" aria-label="Standard" />;
-  }
-}
+// Keep the public board's category and card treatments in step with HostBoard.
+const CATEGORY_PALETTES = [
+  { border: 'border-emerald-200', heading: 'bg-emerald-100 text-emerald-950', card: 'bg-emerald-50 border-emerald-200 text-emerald-950' },
+  { border: 'border-amber-200', heading: 'bg-amber-100 text-amber-950', card: 'bg-amber-50 border-amber-200 text-amber-950' },
+  { border: 'border-orange-200', heading: 'bg-orange-100 text-orange-950', card: 'bg-orange-50 border-orange-200 text-orange-950' },
+  { border: 'border-rose-200', heading: 'bg-rose-100 text-rose-950', card: 'bg-rose-50 border-rose-200 text-rose-950' },
+  { border: 'border-blue-200', heading: 'bg-blue-100 text-blue-950', card: 'bg-blue-50 border-blue-200 text-blue-950' },
+  { border: 'border-violet-200', heading: 'bg-violet-100 text-violet-950', card: 'bg-violet-50 border-violet-200 text-violet-950' },
+  { border: 'border-cyan-200', heading: 'bg-cyan-100 text-cyan-950', card: 'bg-cyan-50 border-cyan-200 text-cyan-950' },
+];
 
-export function ScreenBoard({ segments, cardStates }: ScreenBoardProps) {
+export function ScreenBoard({ segments, cardStates, boardNumber }: ScreenBoardProps) {
+  // The host can curate more than five categories per board; render the same set here.
+  const visibleSegments = segments;
+  const categoryCount = Math.max(visibleSegments.length, 1);
+
   return (
-    <div className="relative flex flex-col min-h-screen w-full bg-[#08080a] text-zinc-100 p-4 md:p-8 select-none justify-between overflow-x-auto">
-      {/* Background ambient lighting */}
-      <div className="absolute top-0 left-1/4 size-[600px] bg-amber-500/5 rounded-full blur-[140px] pointer-events-none" />
-      <div className="absolute bottom-0 right-1/4 size-[600px] bg-orange-600/5 rounded-full blur-[140px] pointer-events-none" />
-
-      {/* Top Header Bar */}
-      <header className="relative z-10 flex items-center justify-between border-b border-zinc-800/80 pb-4 mb-4 shrink-0">
+    <main className="flex h-dvh max-h-dvh w-full flex-col overflow-hidden bg-white px-2 py-3 text-slate-900 select-none sm:px-3 md:px-5">
+      <header className="mx-auto flex h-12 w-full max-w-7xl shrink-0 items-center justify-between border-b border-slate-200 pb-2 sm:h-14">
         <div className="flex items-center gap-3">
-          <div className="size-3 rounded-full bg-amber-400 shadow-[0_0_12px_#f59e0b]" />
-          <h1 className="text-2xl md:text-3xl font-black tracking-tight text-white font-sans">
-            KWIZZ<span className="text-amber-400">ING</span> BOARD
-          </h1>
-        </div>
-
-        <div className="flex items-center gap-4">
-          <Badge variant="outline" className="px-3 py-1 text-xs md:text-sm font-medium border-zinc-700 bg-zinc-900/90 text-zinc-300">
-            <Tv className="size-3.5 mr-1.5 text-amber-400 inline" />
-            Live TV Display
-          </Badge>
-          <div className="text-xs text-zinc-500 font-mono hidden sm:block">
-            Scoreboard revealed between rounds by Host
-          </div>
+          <h1 className="text-xl font-black tracking-tight sm:text-2xl">KWIZZING</h1>
+          <span className="rounded-md bg-slate-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-600 sm:px-3 sm:text-xs">
+            Board {boardNumber}
+          </span>
         </div>
       </header>
 
-      {/* Main Grid Section */}
-      <main className="relative z-10 my-auto py-2 w-full overflow-x-auto pb-6">
-        <div
-          className="grid gap-3 md:gap-4 min-w-full"
-          style={{
-            gridTemplateColumns: `repeat(${Math.max(segments.length, 1)}, minmax(180px, 1fr))`,
-          }}
-        >
-          {segments.map((segment) => (
-            <div key={segment.id} className="flex flex-col gap-4">
-              {/* Segment Column Header */}
-              <div className="bg-gradient-to-b from-zinc-900 to-zinc-950 border border-zinc-800 rounded-xl p-4 text-center shadow-md">
-                <h2 className="text-lg md:text-xl font-bold tracking-tight text-amber-300 line-clamp-2">
+      <section
+        aria-label="Quiz categories and question cards"
+        className="mx-auto grid min-h-0 w-full max-w-7xl flex-1 items-stretch gap-2 pt-3 sm:gap-2.5 sm:pt-4"
+        style={{ gridTemplateColumns: `repeat(${categoryCount}, minmax(0, 1fr))` }}
+      >
+        {visibleSegments.map((segment, segmentIndex) => {
+          const palette = CATEGORY_PALETTES[segmentIndex % CATEGORY_PALETTES.length];
+          const titleSizeVw = 230 / (categoryCount * Math.max(segment.title.length, 1));
+          return (
+            <section key={segment.id} className={`flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border bg-white sm:rounded-2xl ${palette.border}`}>
+              <h2 className={`flex h-20 shrink-0 items-center justify-center px-1.5 text-center font-extrabold uppercase leading-tight tracking-[0.035em] sm:px-2 ${palette.heading}`}>
+                <span className="line-clamp-3 w-full break-normal [text-wrap:balance]" style={{ fontSize: `clamp(.8rem, ${titleSizeVw}vw, 1.125rem)` }}>
                   {segment.title}
-                </h2>
-                <div className="text-xs text-zinc-500 mt-1">
-                  {segment.questions.length} Questions
-                </div>
-              </div>
-
-              {/* Cards in Column */}
-              <div className="flex flex-col gap-3.5">
-                {segment.questions.map((q, idx) => {
-                  const stateKey = `${segment.id}:${q.id}`;
-                  const status = cardStates[stateKey] || 'AVAILABLE';
-                  const isDisabled = status === 'DISABLED';
+                </span>
+              </h2>
+              <div className="flex min-h-0 flex-1 flex-col gap-1.5 p-1 sm:gap-2 sm:p-1.5">
+                {segment.questions.map((question) => {
+                  const key = `${segment.id}:${question.id}`;
+                  const status = cardStates[key] || 'AVAILABLE';
+                  const isDone = status === 'DISABLED';
                   const isActive = status === 'ACTIVE';
-
-                  if (isDisabled) {
-                    return (
-                      <div
-                        key={q.id}
-                        className="flex flex-col items-center justify-center min-h-[92px] md:min-h-[110px] rounded-xl border border-zinc-900 bg-zinc-950/40 text-zinc-700 select-none transition-all duration-300 opacity-30"
-                      >
-                        <span className="text-xs font-mono font-medium tracking-wider text-zinc-600">
-                          Q{idx + 1} • COMPLETED
-                        </span>
-                      </div>
-                    );
-                  }
-
                   return (
                     <div
-                      key={q.id}
-                      className={`relative flex flex-col items-center justify-between p-4 min-h-[92px] md:min-h-[110px] rounded-xl border transition-all duration-300 shadow-lg ${
-                        isActive
-                          ? 'border-amber-400 bg-gradient-to-br from-amber-950/40 to-zinc-900 shadow-[0_0_30px_rgba(245,158,11,0.35)] ring-2 ring-amber-400/50 scale-[1.02]'
-                          : 'border-zinc-800 hover:border-zinc-700 bg-gradient-to-br from-zinc-900/90 to-zinc-950 text-zinc-100 shadow-zinc-950/50'
+                      key={question.id}
+                      className={`relative flex min-h-0 flex-1 items-center justify-center rounded-lg border font-mono text-[clamp(1.2rem,2.2vw,1.9rem)] font-black tracking-tight sm:rounded-xl ${
+                        isDone
+                          ? 'border-zinc-200 bg-zinc-100 text-zinc-500 opacity-60'
+                          : isActive
+                            ? 'border-amber-400 bg-amber-100 text-amber-950 ring-2 ring-amber-300'
+                            : `${palette.card} shadow-sm`
                       }`}
                     >
-                      <div className="flex items-center justify-between w-full">
-                        <span className="text-xs font-mono text-zinc-400 font-semibold">
-                          Q{idx + 1}
-                        </span>
-                        <div className="size-7 flex items-center justify-center rounded-lg bg-zinc-800/80">
-                          {getTypeIcon(q.type)}
-                        </div>
-                      </div>
-
-                      <div className="flex items-baseline justify-center gap-2 mt-2">
-                        <span className="text-2xl md:text-3xl font-black text-amber-400 font-mono tracking-tight">
-                          +{q.pointsRight}
-                        </span>
-                        {q.pointsWrong !== 0 && (
-                          <span className="text-sm md:text-base font-semibold text-rose-400 font-mono">
-                            {q.pointsWrong}
-                          </span>
-                        )}
-                      </div>
+                      <span>{question.pointsRight}</span>
+                      {isActive && <span className="absolute bottom-1 text-[9px] font-sans font-bold uppercase tracking-wider">In play</span>}
                     </div>
                   );
                 })}
+                {segment.questions.length === 0 && <p className="m-auto text-center text-xs text-zinc-400">No cards in this category</p>}
               </div>
-            </div>
-          ))}
-        </div>
-      </main>
-
-      {/* Footer Info */}
-      <footer className="relative z-10 flex items-center justify-between border-t border-zinc-900 pt-4 text-xs font-mono text-zinc-500">
-        <div>CHOOSE A CARD FROM THE BOARD</div>
-        <div className="flex items-center gap-2">
-          <Trophy className="size-4 text-amber-400/80" />
-          <span>Host holds master controls &amp; scores</span>
-        </div>
-      </footer>
-    </div>
+            </section>
+          );
+        })}
+      </section>
+    </main>
   );
 }

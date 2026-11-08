@@ -3,7 +3,7 @@
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Tv, Shield, Trophy, Volume2, VolumeX, ExternalLink } from 'lucide-react';
+import { Tv, Shield, Trophy, Volume2, VolumeX, ExternalLink, BookOpen } from 'lucide-react';
 import { DisplayCommand } from '@/types/quiz';
 
 interface HostHeaderProps {
@@ -12,6 +12,7 @@ interface HostHeaderProps {
   onShowBoard: () => void;
   onShowCurtain: () => void;
   onShowScoreboard: () => void;
+  onShowScoreLedger: () => void;
   isMuted: boolean;
   onToggleMute: () => void;
 }
@@ -22,6 +23,7 @@ export function HostHeader({
   onShowBoard,
   onShowCurtain,
   onShowScoreboard,
+  onShowScoreLedger,
   isMuted,
   onToggleMute,
 }: HostHeaderProps) {
@@ -32,10 +34,13 @@ export function HostHeader({
   if (!currentDisplayCommand || currentDisplayCommand.type === 'SHOW_CURTAIN') {
     tvStatus = 'CURTAIN (SAFE)';
     badgeColor = 'bg-amber-500/20 text-amber-300 border-amber-500/40';
-  } else if (currentDisplayCommand.type === 'SHOW_QUESTION' || currentDisplayCommand.type === 'REVEAL_CLUE') {
+  } else if (currentDisplayCommand.type === 'SHOW_QUESTION' || currentDisplayCommand.type === 'REVEAL_CLUE' || currentDisplayCommand.type === 'UPDATE_CLUE' || currentDisplayCommand.type === 'HIDE_CLUE' || (currentDisplayCommand.type === 'RESTORE_QUESTION' && !currentDisplayCommand.revealedAnswer)) {
     tvStatus = 'QUESTION ACTIVE';
     badgeColor = 'bg-sky-500/20 text-sky-300 border-sky-500/40';
-  } else if (currentDisplayCommand.type === 'REVEAL_ANSWER') {
+  } else if (currentDisplayCommand.type === 'SHOW_SELECTION') {
+    tvStatus = 'QUESTION SELECTED';
+    badgeColor = 'bg-amber-500/20 text-amber-300 border-amber-500/40';
+  } else if (currentDisplayCommand.type === 'REVEAL_ANSWER' || (currentDisplayCommand.type === 'RESTORE_QUESTION' && currentDisplayCommand.revealedAnswer)) {
     tvStatus = 'ANSWER REVEALED';
     badgeColor = 'bg-purple-500/20 text-purple-300 border-purple-500/40';
   } else if (currentDisplayCommand.type === 'SHOW_SCOREBOARD' || currentDisplayCommand.type === 'SHOW_FINAL_SCORES') {
@@ -51,7 +56,7 @@ export function HostHeader({
   }
 
   return (
-    <header className="sticky top-0 z-40 w-full bg-zinc-950/95 border-b border-zinc-800/80 backdrop-blur-md px-4 py-3 md:px-8">
+    <header className="sticky top-0 z-40 w-full shrink-0 bg-zinc-950/95 border-b border-zinc-800/80 backdrop-blur-md px-4 py-3 md:px-8">
       <div className="flex flex-wrap items-center justify-between gap-3 max-w-7xl mx-auto">
         {/* Title and TV status */}
         <div className="flex items-center gap-3">
@@ -65,7 +70,7 @@ export function HostHeader({
           </div>
 
           <Badge className={`ml-2 px-2.5 py-1 text-xs font-mono font-semibold border ${badgeColor}`}>
-            <span className="size-2 rounded-full bg-current animate-ping mr-2 inline-block" />
+            <span className="size-2 rounded-full bg-current mr-2 inline-block" />
             TV: {tvStatus}
           </Badge>
         </div>
@@ -100,6 +105,16 @@ export function HostHeader({
           >
             <Trophy data-icon="inline-start" />
             Scoreboard
+          </Button>
+
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onShowScoreLedger}
+            className="border-zinc-800 text-zinc-300 hover:bg-zinc-900 hover:text-white"
+          >
+            <BookOpen data-icon="inline-start" />
+            Score Ledger
           </Button>
 
           <Button

@@ -1,5 +1,9 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Quiz content
+
+`Buzzing with Kvizzing Shortlist.csv` is the source of truth for the built-in quiz. Start the app with `./start.sh`; the CSV is converted into the built-in quiz automatically, and changes to the CSV while the dev server is running are picked up without importing the file in the app. `npm run build` also refreshes the built-in quiz before building. Do not edit `lib/docx-shortlist-quiz.ts` directly; it is generated from the CSV.
+
 ## Getting Started
 
 First, run the development server:

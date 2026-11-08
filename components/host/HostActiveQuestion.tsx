@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Segment, QnA, TeamScore, DisplayCommand } from '@/types/quiz';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -8,16 +8,20 @@ import {
   CheckCircle2,
   Tv,
   ArrowLeft,
-  Search,
   Eye,
   Sparkles,
   Undo2,
-  AlertTriangle,
-  HelpCircle,
-  Link as LinkIcon,
-  Image as ImageIcon,
 } from 'lucide-react';
 import { sounds } from '@/lib/sound';
+import { ScreenQuestion } from '@/components/screen/ScreenQuestion';
+
+function getAnswerSize(text: string): string {
+  const length = text.trim().length;
+  if (length > 180) return 'clamp(.78rem, .95vw, .9rem)';
+  if (length > 110) return 'clamp(.85rem, 1.05vw, 1rem)';
+  if (length > 60) return 'clamp(.95rem, 1.2vw, 1.15rem)';
+  return 'clamp(1rem, 1.45vw, 1.35rem)';
+}
 
 interface HostActiveQuestionProps {
   segment: Segment;
@@ -26,11 +30,13 @@ interface HostActiveQuestionProps {
   teams: TeamScore[];
   currentDisplayCommand: DisplayCommand | null;
   onSendCommand: (cmd: DisplayCommand) => void;
+  onUpdateClues: (clues: string[]) => void;
   onAwardScore: (teamName: string, delta: number) => void;
   onUndoScore: () => void;
   canUndo: boolean;
   onCompleteCard: () => void;
   onCancelCard: () => void;
+  activeCardProgress?: { revealedClueIndices?: number[]; isQuestionShown?: boolean; isAnswerRevealed?: boolean };
 }
 
 export function HostActiveQuestion({
@@ -40,31 +46,33 @@ export function HostActiveQuestion({
   teams,
   currentDisplayCommand,
   onSendCommand,
+  onUpdateClues,
   onAwardScore,
   onUndoScore,
   canUndo,
   onCompleteCard,
   onCancelCard,
+  activeCardProgress,
 }: HostActiveQuestionProps) {
-  const [revealedClueIndices, setRevealedClueIndices] = useState<number[]>([]);
-  const [localQuestionPushed, setLocalQuestionPushed] = useState(false);
-  const [localAnswerPushed, setLocalAnswerPushed] = useState(false);
-
-  // Hold-to-reveal answer state
-  const [answerHoldProgress, setAnswerHoldProgress] = useState(0);
-  const holdTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [revealedClueIndices, setRevealedClueIndices] = useState<number[]>(activeCardProgress?.revealedClueIndices ?? []);
+  const [localQuestionPushed, setLocalQuestionPushed] = useState(activeCardProgress?.isQuestionShown ?? false);
+  const [localAnswerPushed, setLocalAnswerPushed] = useState(activeCardProgress?.isAnswerRevealed ?? false);
+  const [customHint, setCustomHint] = useState('');
 
   // Derived state (Vercel React best practice: derive during render, no effect)
   const isQuestionShownOnTV =
     localQuestionPushed ||
     currentDisplayCommand?.type === 'SHOW_QUESTION' ||
     currentDisplayCommand?.type === 'REVEAL_CLUE' ||
+    currentDisplayCommand?.type === 'UPDATE_CLUE' ||
+    currentDisplayCommand?.type === 'HIDE_CLUE' ||
     currentDisplayCommand?.type === 'REVEAL_ANSWER';
 
   const isAnswerRevealedOnTV =
     localAnswerPushed || currentDisplayCommand?.type === 'REVEAL_ANSWER';
 
   const clues = qna.clues || [];
+  const wrongPoints = -Math.abs(qna.pointsRight);
   const nextClueIndex = clues.findIndex((_, i) => !revealedClueIndices.includes(i));
 
   function triggerShowQuestionOnTV() {
@@ -75,10 +83,14 @@ export function HostActiveQuestion({
       cardIndex,
       totalInSegment: segment.questions.length,
       prompt: qna.prompt,
+      description: qna.description,
       questionType: qna.type,
       media: qna.media,
+      revealMedia: qna.revealMedia,
+      displayMediaOnly: qna.displayMediaOnly,
+      releaseYear: qna.releaseYear,
       pointsRight: qna.pointsRight,
-      pointsWrong: qna.pointsWrong,
+      pointsWrong: wrongPoints,
       clueCount: clues.length,
     });
   }
@@ -94,51 +106,49 @@ export function HostActiveQuestion({
     sounds.playClueReveal();
   }
 
+  function hideClue(index: number) {
+    if (!revealedClueIndices.includes(index)) return;
+    setRevealedClueIndices((prev) => prev.filter((revealedIndex) => revealedIndex !== index));
+    onSendCommand({ type: 'HIDE_CLUE', index });
+  }
+
+  function editClue(index: number, text: string) {
+    const updatedClues = clues.map((clue, clueIndex) => clueIndex === index ? text : clue);
+    onUpdateClues(updatedClues);
+    if (revealedClueIndices.includes(index)) {
+      onSendCommand({ type: 'UPDATE_CLUE', index, text });
+    }
+  }
+
+  function addCustomHint() {
+    const text = customHint.trim();
+    if (!text) return;
+    onUpdateClues([...clues, text]);
+    setCustomHint('');
+  }
+
   function revealNextClue() {
     if (nextClueIndex !== -1) {
       revealClue(nextClueIndex);
     }
   }
 
-  function startHoldAnswer() {
-    if (isAnswerRevealedOnTV) return;
-    let progress = 0;
-    setAnswerHoldProgress(10);
-
-    holdTimerRef.current = setInterval(() => {
-      progress += 25;
-      setAnswerHoldProgress(progress);
-      if (progress >= 100) {
-        clearInterval(holdTimerRef.current!);
-        holdTimerRef.current = null;
-        triggerRevealAnswer();
-      }
-    }, 75);
-  }
-
-  function cancelHoldAnswer() {
-    if (holdTimerRef.current) {
-      clearInterval(holdTimerRef.current);
-      holdTimerRef.current = null;
-    }
-    setAnswerHoldProgress(0);
-  }
-
   function triggerRevealAnswer() {
+    if (isAnswerRevealedOnTV) return;
     setLocalAnswerPushed(true);
-    setAnswerHoldProgress(0);
     onSendCommand({
       type: 'REVEAL_ANSWER',
       answer: qna.answer,
       explanation: qna.explanation,
     });
-    sounds.playCorrect();
+    sounds.playAnswerReveal();
   }
 
   // Keyboard shortcut handler
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      const target = e.target;
+      if (target instanceof HTMLElement && target.closest('input, textarea, select, [contenteditable="true"], [role="textbox"]')) {
         return;
       }
 
@@ -152,6 +162,9 @@ export function HostActiveQuestion({
       } else if (e.code === 'Escape') {
         e.preventDefault();
         onCompleteCard();
+      } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && e.code === 'KeyA') {
+        e.preventDefault();
+        triggerRevealAnswer();
       }
     }
 
@@ -162,7 +175,7 @@ export function HostActiveQuestion({
   function handleScoreClick(teamName: string, delta: number) {
     onAwardScore(teamName, delta);
     if (delta > 0) {
-      sounds.playCorrect();
+      sounds.playPositiveScore();
     } else if (delta < 0) {
       sounds.playWrong();
     }
@@ -178,9 +191,9 @@ export function HostActiveQuestion({
   }
 
   return (
-    <div className="w-full max-w-5xl mx-auto px-4 py-6 md:px-8">
+    <div className="mx-auto flex h-full min-h-0 w-full max-w-7xl flex-col overflow-hidden px-3 py-2 lg:px-5">
       {/* Top Navigation Bar */}
-      <div className="flex items-center justify-between pb-4 border-b border-zinc-800 mb-6">
+      <div className="mb-2 flex shrink-0 items-center justify-between gap-1.5 border-b border-zinc-800 pb-2">
         <Button
           variant="ghost"
           size="sm"
@@ -203,53 +216,56 @@ export function HostActiveQuestion({
         <Button
           size="sm"
           onClick={onCompleteCard}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs"
+          title="Complete Card & Back to Board"
+          className="whitespace-nowrap bg-emerald-600 text-[10px] font-semibold text-white hover:bg-emerald-700 sm:text-xs"
         >
-          <CheckCircle2 className="size-4 mr-1.5" />
-          Complete Card &amp; Back to Board
+          <CheckCircle2 className="mr-1 size-4" />
+          Complete &amp; Back
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column: Question Details & TV Progression Controls (7 cols) */}
-        <div className="lg:col-span-7 flex flex-col gap-6">
-          {/* Question Prompt Card */}
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-xl">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs uppercase font-mono font-bold text-amber-400 flex items-center gap-1.5">
-                {qna.type === 'CLUE_BASED' && <Search className="size-3.5" />}
-                {qna.type === 'IMAGE_BASED' && <ImageIcon className="size-3.5" />}
-                {qna.type === 'CONNECT' && <LinkIcon className="size-3.5" />}
-                {qna.type === 'STANDARD' && <HelpCircle className="size-3.5" />}
-                {qna.type} QUESTION
-              </span>
+      {/* Keep the host-only answer visible without pushing the rest of the controls below the fold. */}
+      <section className="mb-2 flex shrink-0 items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 sm:gap-4 sm:px-4">
+        <div className="min-w-0 flex-1">
+          <span className="mb-0.5 block text-[9px] font-bold uppercase tracking-wider text-emerald-400">Host Answer</span>
+          <h2 className="line-clamp-2 whitespace-pre-wrap font-extrabold uppercase leading-tight text-emerald-200" style={{ fontSize: getAnswerSize(qna.answer) }}>{qna.answer}</h2>
+          {qna.explanation && <p className="mt-0.5 line-clamp-1 text-[10px] leading-snug text-zinc-400">{qna.explanation}</p>}
+        </div>
+        {!isAnswerRevealedOnTV ? (
+          <Button onClick={triggerRevealAnswer} className="h-9 shrink-0 bg-emerald-600 px-3 text-[10px] font-bold text-white hover:bg-emerald-500 sm:text-xs">
+            <Sparkles className="mr-1.5 size-3.5" />
+            Reveal Answer
+          </Button>
+        ) : (
+          <Badge className="shrink-0 border border-emerald-500/40 bg-emerald-500/15 text-[10px] text-emerald-300">Revealed on TV</Badge>
+        )}
+      </section>
 
-              <div className="flex items-center gap-2 font-mono text-xs">
-                <span className="font-bold text-amber-400">+{qna.pointsRight} pts</span>
-                {qna.pointsWrong !== 0 && (
-                  <span className="text-rose-400 font-bold">{qna.pointsWrong} pts</span>
-                )}
-              </div>
-            </div>
+      <div className="grid min-h-0 flex-1 grid-cols-12 gap-2.5 overflow-hidden lg:gap-3">
+        {/* Preview uses the exact same question renderer as the public screen. */}
+        <div className="col-span-8 flex min-h-0 flex-col gap-2 xl:col-span-9">
+          <div className="min-h-0 flex-1 overflow-hidden rounded-2xl border border-zinc-800 shadow-xl [container-type:inline-size]">
+            <ScreenQuestion
+              segmentTitle={segment.title}
+              cardIndex={cardIndex}
+              totalInSegment={segment.questions.length}
+              prompt={qna.prompt}
+              description={qna.description}
+              questionType={qna.type}
+              media={qna.media}
+              revealMedia={qna.revealMedia}
+              displayMediaOnly={qna.displayMediaOnly}
+              releaseYear={qna.releaseYear}
+              pointsRight={qna.pointsRight}
+              pointsWrong={wrongPoints}
+              revealedClues={revealedClueIndices.flatMap((index) => clues[index] ? [{ index, text: clues[index] }] : [])}
+              totalCluesCount={clues.length}
+              preview
+            />
+          </div>
 
-            <h2 className="text-xl md:text-2xl font-bold text-white tracking-tight leading-snug">
-              {qna.prompt}
-            </h2>
-
-            {/* Media Image Preview for Host */}
-            {qna.media && (
-              <div className="mt-3 flex justify-center max-h-56 rounded-xl overflow-hidden border border-zinc-800 bg-zinc-950/80 p-2">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={qna.media}
-                  alt={qna.prompt}
-                  className="object-contain max-h-52 w-auto rounded-lg mx-auto"
-                />
-              </div>
-            )}
-
-            {/* TV Push Trigger */}
-            <div className="mt-4 pt-4 border-t border-zinc-800/80 flex items-center justify-between">
+          {/* TV action stays in a fixed position across text and image cards. */}
+          <div className="flex shrink-0 items-center justify-between gap-2 rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2">
               <div className="flex items-center gap-2 text-xs font-mono">
                 <Tv className="size-4 text-zinc-500" />
                 <span className={isQuestionShownOnTV ? 'text-emerald-400 font-semibold' : 'text-amber-400'}>
@@ -271,14 +287,16 @@ export function HostActiveQuestion({
                   Active on TV
                 </Badge>
               )}
-            </div>
           </div>
 
           {/* Clues Section */}
-          {clues.length > 0 && (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-xl">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-bold text-zinc-200 uppercase tracking-wider font-mono">
+            <details className="shrink-0 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-xl">
+              <summary className="cursor-pointer select-none px-3 py-2.5 text-xs font-bold text-zinc-200 marker:text-amber-400">
+                Hints &amp; clues <span className="ml-1 font-mono font-normal text-zinc-500">({clues.length})</span>
+              </summary>
+              <div className="max-h-[32vh] overflow-y-auto overscroll-contain border-t border-zinc-800 p-3 sm:p-4">
+              <div className="mb-2 flex shrink-0 items-center justify-between gap-2">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-200 font-mono">
                   Progressive Hints / Clues ({revealedClueIndices.length}/{clues.length} on TV)
                 </h3>
 
@@ -295,121 +313,83 @@ export function HostActiveQuestion({
                 )}
               </div>
 
-              <div className="flex flex-col gap-3">
+              <div className="pr-1">
+                {clues.length > 0 ? <div className="flex flex-col gap-2">
                 {clues.map((clueText, idx) => {
                   const isRevealed = revealedClueIndices.includes(idx);
 
                   return (
                     <div
                       key={idx}
-                      className={`flex items-start justify-between gap-3 p-3.5 rounded-xl border transition-all ${
+                      className={`flex items-start justify-between gap-2 rounded-xl border p-2 transition-all ${
                         isRevealed
                           ? 'border-amber-500/40 bg-amber-950/20 text-zinc-100'
                           : 'border-zinc-800 bg-zinc-950/40 text-zinc-400'
                       }`}
                     >
-                      <div className="flex items-start gap-2.5">
-                        <span className={`size-6 rounded-md flex items-center justify-center font-mono text-xs font-bold shrink-0 mt-0.5 ${
+                      <div className="flex min-w-0 flex-1 items-start gap-2">
+                        <span className={`mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md font-mono text-xs font-bold ${
                           isRevealed ? 'bg-amber-400 text-zinc-950' : 'bg-zinc-800 text-zinc-500'
                         }`}>
                           {idx + 1}
                         </span>
-                        <p className="text-sm leading-relaxed">
-                          {clueText}
-                        </p>
+                        <textarea
+                          aria-label={`Edit hint ${idx + 1}`}
+                          value={clueText}
+                          onChange={(event) => editClue(idx, event.target.value)}
+                          rows={2}
+                          className="min-h-9 w-full resize-none rounded-lg border border-zinc-800 bg-zinc-900/80 px-2.5 py-1.5 text-xs leading-relaxed text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/30"
+                        />
                       </div>
 
                       <Button
                         size="sm"
                         variant={isRevealed ? 'ghost' : 'outline'}
-                        disabled={isRevealed || !isQuestionShownOnTV}
-                        onClick={() => revealClue(idx)}
-                        className={`text-xs h-7 shrink-0 ${
+                        disabled={!isRevealed && !isQuestionShownOnTV}
+                        onClick={() => isRevealed ? hideClue(idx) : revealClue(idx)}
+                        className={`h-7 shrink-0 text-xs ${
                           isRevealed
-                            ? 'text-emerald-400 hover:text-emerald-300'
+                            ? 'text-amber-300 hover:bg-amber-950/40 hover:text-amber-200'
                             : 'border-zinc-700 hover:border-amber-400 text-zinc-300'
                         }`}
                       >
-                        {isRevealed ? 'On TV' : 'Reveal'}
+                        {isRevealed ? <><Undo2 className="mr-1 size-3" />Take Back</> : 'Reveal'}
                       </Button>
                     </div>
                   );
                 })}
+              </div> : <p className="py-3 text-center text-xs text-zinc-500">No hints for this question.</p>}
               </div>
-            </div>
-          )}
 
-          {/* Secret Answer Card & Reveal Action */}
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-xl">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs uppercase font-mono font-bold text-emerald-400 flex items-center gap-1.5">
-                <CheckCircle2 className="size-4" />
-                Host Verified Answer (Host Eyes Only)
-              </span>
-
-              {isAnswerRevealedOnTV && (
-                <Badge className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-xs">
-                  Revealed on TV Screen
-                </Badge>
-              )}
-            </div>
-
-            <div className="p-4 rounded-xl bg-zinc-950 border border-emerald-900/50 mb-4">
-              <h4 className="text-xl md:text-2xl font-black text-emerald-300 tracking-tight">
-                {qna.answer}
-              </h4>
-              {qna.explanation && (
-                <p className="text-xs text-zinc-400 mt-2 border-t border-zinc-800 pt-2 font-mono">
-                  {qna.explanation}
-                </p>
-              )}
-            </div>
-
-            {/* Answer Reveal Button with 300ms Hold Prevention */}
-            {!isAnswerRevealedOnTV ? (
-              <div className="flex flex-col gap-2">
-                <button
-                  type="button"
-                  onMouseDown={startHoldAnswer}
-                  onMouseUp={cancelHoldAnswer}
-                  onMouseLeave={cancelHoldAnswer}
-                  onTouchStart={startHoldAnswer}
-                  onTouchEnd={cancelHoldAnswer}
-                  className="relative overflow-hidden w-full h-12 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-sm tracking-wide shadow-lg active:scale-[0.99] transition-all select-none cursor-pointer flex items-center justify-center gap-2"
-                >
-                  {/* Fill progress overlay */}
-                  <div
-                    className="absolute inset-0 bg-emerald-400/30 transition-all pointer-events-none"
-                    style={{ width: `${answerHoldProgress}%` }}
+              <div className="mt-2 shrink-0 border-t border-zinc-800 pt-2">
+                <label htmlFor="custom-hint" className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-zinc-300">
+                  Custom Hint
+                </label>
+                <div className="flex items-end gap-2">
+                  <textarea
+                    id="custom-hint"
+                    aria-label="Write a custom hint"
+                    value={customHint}
+                    onChange={(event) => setCustomHint(event.target.value)}
+                    placeholder="Write a hint for this question…"
+                    rows={1}
+                    className="min-h-9 flex-1 resize-none rounded-lg border border-zinc-800 bg-zinc-950 px-2.5 py-1.5 text-xs text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/30"
                   />
-                  <Sparkles className="size-4" />
-                  <span>
-                    {answerHoldProgress > 0
-                      ? 'HOLDING... CONFIRMING REVEAL'
-                      : 'HOLD TO REVEAL ANSWER ON TV (Hot-key: A)'}
-                  </span>
-                </button>
-                <div className="flex items-center justify-center gap-1.5 text-[11px] text-zinc-500 font-mono">
-                  <AlertTriangle className="size-3 text-amber-500" />
-                  <span>Holding prevents accidental spoiler leaks on the big TV</span>
+                  <Button size="sm" onClick={addCustomHint} disabled={!customHint.trim()} className="h-9 bg-amber-500 font-bold text-zinc-950 hover:bg-amber-400">
+                    Add Hint
+                  </Button>
                 </div>
               </div>
-            ) : (
-              <div className="flex items-center justify-between p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/40 text-emerald-300 text-xs font-semibold">
-                <span>Answer is actively displayed with celebration on the TV screen.</span>
-                <Sparkles className="size-4 text-emerald-400 animate-spin" style={{ animationDuration: '6s' }} />
               </div>
-            )}
-          </div>
+            </details>
+
         </div>
 
         {/* Right Column: Scoring Pad & Team Controls (5 cols) */}
-        <div className="lg:col-span-5 flex flex-col gap-6">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-xl sticky top-20">
-            <div className="flex items-center justify-between mb-4 pb-3 border-b border-zinc-800">
-              <h3 className="font-bold text-sm uppercase tracking-wider text-zinc-200 font-mono">
-                Team Scoring Pad
-              </h3>
+        <div className="col-span-4 flex min-h-0 flex-col xl:col-span-3">
+          <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 p-2 shadow-xl sm:p-3">
+            <div className="mb-2 flex shrink-0 items-center justify-between border-b border-zinc-800 pb-2">
+              <h3 className="font-bold text-xs uppercase tracking-wider text-zinc-200 font-mono">Scoring</h3>
 
               {canUndo && (
                 <Button
@@ -423,47 +403,47 @@ export function HostActiveQuestion({
               )}
             </div>
 
-            <div className="flex flex-col gap-3">
+            <div className="flex min-h-0 flex-1 flex-col justify-around gap-2 overflow-hidden">
               {teams.map((team) => (
                 <div
                   key={team.name}
-                  className="p-3.5 rounded-xl border border-zinc-800 bg-zinc-950/70 flex flex-col gap-2.5"
+                  className="flex shrink-0 flex-col gap-1.5 rounded-xl border border-zinc-800 bg-zinc-950/70 p-2"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-white text-sm tracking-tight line-clamp-1">
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="min-w-0 truncate text-xs font-bold tracking-tight text-white">
                       {team.name}
                     </span>
-                    <span className="font-mono text-lg font-black text-amber-400">
-                      {team.score} pts
+                    <span className="shrink-0 whitespace-nowrap font-mono text-sm font-black text-amber-400" title={`${team.score} points`}>
+                      {team.score}
                     </span>
                   </div>
 
                   {/* Point Action Buttons */}
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-3 gap-1.5">
                     <Button
                       size="sm"
                       onClick={() => handleScoreClick(team.name, qna.pointsRight)}
-                      className="bg-emerald-600 hover:bg-emerald-500 text-white font-mono font-bold text-xs h-8"
+                      className="h-7 bg-emerald-600 text-[10px] font-mono font-bold text-white hover:bg-emerald-500"
                     >
                       +{qna.pointsRight}
                     </Button>
 
                     <Button
                       size="sm"
-                      disabled={qna.pointsWrong === 0}
-                      onClick={() => handleScoreClick(team.name, qna.pointsWrong)}
-                      className="bg-rose-900/60 hover:bg-rose-800 text-rose-200 font-mono font-bold text-xs h-8 border border-rose-800/50"
+                      onClick={() => handleScoreClick(team.name, wrongPoints)}
+                      className="h-7 border border-rose-800/50 bg-rose-900/60 text-[10px] font-mono font-bold text-rose-200 hover:bg-rose-800"
                     >
-                      {qna.pointsWrong !== 0 ? qna.pointsWrong : '0'}
+                      {wrongPoints}
                     </Button>
 
                     <Button
                       size="sm"
                       variant="outline"
                       onClick={() => handleCustomScore(team.name)}
-                      className="border-zinc-700 hover:border-zinc-500 text-zinc-300 font-mono text-xs h-8"
+                      aria-label={`Custom score for ${team.name}`}
+                      className="h-7 border-zinc-700 text-[10px] font-mono text-zinc-300 hover:border-zinc-500"
                     >
-                      Custom ±
+                      ±
                     </Button>
                   </div>
                 </div>
@@ -471,9 +451,9 @@ export function HostActiveQuestion({
             </div>
 
             {/* Quick Keyboard Reference */}
-            <div className="mt-6 pt-4 border-t border-zinc-800 text-[11px] font-mono text-zinc-500 flex flex-col gap-1">
+            <div className="mt-auto hidden shrink-0 border-t border-zinc-800 pt-2 text-[10px] font-mono text-zinc-500 xl:flex xl:flex-col xl:gap-1">
               <div><kbd className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300">Space</kbd> Show / Reveal Next Hint</div>
-              <div><kbd className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300">Hold A</kbd> Reveal Answer</div>
+              <div><kbd className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300">Ctrl/⌘ + Shift + A</kbd> Reveal Answer</div>
               <div><kbd className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300">Esc</kbd> Complete &amp; Return to Board</div>
             </div>
           </div>

@@ -1,185 +1,160 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import { QuestionType } from '@/types/quiz';
-import { Badge } from '@/components/ui/badge';
-import { CheckCircle2, HelpCircle, Image as ImageIcon, Link as LinkIcon, Search, Sparkles } from 'lucide-react';
-import confetti from 'canvas-confetti';
+
+function getPromptFontSize(prompt: string, preview: boolean): string {
+  const length = prompt.trim().length;
+  if (preview) {
+    if (length > 500) return 'clamp(.625rem, 1.4cqw, 1rem)';
+    if (length > 360) return 'clamp(.7rem, 1.8cqw, 1.15rem)';
+    if (length > 260) return 'clamp(.85rem, 2.7cqw, 1.6rem)';
+    return 'clamp(1.15rem, 3.4cqw, 1.9rem)';
+  }
+  if (length > 500) return 'clamp(1rem, 1.4vw, 1.55rem)';
+  if (length > 360) return 'clamp(1.1rem, 1.8vw, 1.9rem)';
+  if (length > 260) return 'clamp(1.35rem, 2.7vw, 2.8rem)';
+  return 'clamp(1.55rem, 3.4vw, 3.2rem)';
+}
+
+function getAnswerFontSize(answer: string): string {
+  const length = answer.trim().length;
+  if (length > 150) return 'clamp(1rem, 1.8vw, 1.45rem)';
+  if (length > 100) return 'clamp(1.15rem, 2.2vw, 1.8rem)';
+  if (length > 60) return 'clamp(1.35rem, 2.8vw, 2.3rem)';
+  return 'clamp(1.6rem, 3.5vw, 2.8rem)';
+}
 
 interface ScreenQuestionProps {
   segmentTitle: string;
   cardIndex: number;
   totalInSegment: number;
   prompt: string;
+  description?: string;
   questionType: QuestionType;
   media?: string;
+  revealMedia?: string;
+  displayMediaOnly?: boolean;
+  releaseYear?: string;
   pointsRight: number;
   pointsWrong: number;
   revealedClues: { index: number; text: string }[];
   revealedAnswer?: { answer: string; explanation?: string };
   totalCluesCount: number;
+  preview?: boolean;
 }
 
 export function ScreenQuestion({
   segmentTitle,
-  cardIndex,
-  totalInSegment,
   prompt,
-  questionType,
+  description,
   media,
+  revealMedia,
+  displayMediaOnly = false,
+  releaseYear,
   pointsRight,
-  pointsWrong,
   revealedClues,
   revealedAnswer,
-  totalCluesCount,
+  preview = false,
 }: ScreenQuestionProps) {
-  const hasFiredConfetti = useRef(false);
-
-  useEffect(() => {
-    if (revealedAnswer && !hasFiredConfetti.current) {
-      hasFiredConfetti.current = true;
-      try {
-        confetti({
-          particleCount: 120,
-          spread: 80,
-          origin: { y: 0.6 },
-          colors: ['#F59E0B', '#10B981', '#3B82F6', '#EC4899', '#FFFFFF'],
-        });
-      } catch {
-        // Safe fallback if canvas-confetti fails
-      }
-    }
-  }, [revealedAnswer]);
+  const isLogoAnswer = displayMediaOnly || segmentTitle.toLowerCase().includes('logo');
+  const showsAddressAnswerImage = segmentTitle.trim().toLowerCase() === 'let me address this';
+  const finalAnswerImage = revealMedia && (isLogoAnswer || showsAddressAnswerImage) ? revealMedia : undefined;
+  const compactPromptLineBreaks = segmentTitle.trim().toLowerCase() === 'two words one letter apart';
 
   return (
-    <div className="relative flex flex-col min-h-screen w-full bg-[#070709] text-zinc-100 p-8 md:p-14 justify-between select-none overflow-hidden">
-      {/* Background ambient lighting */}
-      <div className="absolute -top-32 left-1/3 size-[700px] bg-amber-500/10 rounded-full blur-[160px] pointer-events-none" />
-      <div className="absolute -bottom-32 right-1/4 size-[700px] bg-indigo-500/10 rounded-full blur-[160px] pointer-events-none" />
+    <div className={`relative flex ${preview ? 'h-full max-h-full px-3 py-2' : 'h-dvh max-h-dvh px-4 py-4 sm:px-7 sm:py-6 md:px-10 md:py-7'} w-full flex-col overflow-hidden bg-[#f6f5f1] text-slate-950 select-none ${revealedAnswer ? 'uppercase' : ''}`}>
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_46%,rgba(255,255,255,0.96)_0%,rgba(255,255,255,0.55)_42%,rgba(246,245,241,0)_76%)]" />
 
-      {/* Top Bar Header */}
-      <header className="relative z-10 flex items-center justify-between border-b border-zinc-800/80 pb-6">
-        <div className="flex items-center gap-4">
-          <Badge className="bg-amber-500/20 text-amber-300 border border-amber-500/40 px-4 py-1.5 text-base font-semibold">
+      <header className={`relative z-10 mx-auto flex w-full max-w-7xl shrink-0 items-center justify-between gap-4 border-b border-slate-900/10 ${preview ? 'pb-2' : 'pb-4 sm:pb-5'}`}>
+        <div className="min-w-0">
+          <span className="mb-1 block text-[9px] font-bold uppercase tracking-[0.24em] text-slate-500 sm:text-[10px]">Category</span>
+          <h1 className="line-clamp-1 text-left text-[clamp(1.15rem,2.8vw,2rem)] font-black leading-tight tracking-[-0.035em] text-slate-900">
             {segmentTitle}
-          </Badge>
-          <span className="text-zinc-400 font-mono text-sm">
-            Question {cardIndex + 1} of {totalInSegment}
-          </span>
+          </h1>
         </div>
-
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-zinc-900 border border-zinc-800">
-            <span className="text-xs uppercase text-zinc-500 font-mono font-medium">Stakes:</span>
-            <span className="text-xl font-black text-amber-400 font-mono">+{pointsRight}</span>
-            {pointsWrong !== 0 && (
-              <span className="text-base font-bold text-rose-400 font-mono">{pointsWrong}</span>
-            )}
-          </div>
+        <div className="flex shrink-0 items-baseline gap-2 rounded-2xl bg-slate-950 px-4 py-2 text-white shadow-[0_8px_24px_rgba(15,23,42,0.16)] sm:gap-2.5 sm:px-5 sm:py-2.5">
+          <span className="font-mono text-[clamp(1.25rem,3vw,2.1rem)] font-black leading-none tracking-tight text-amber-300">{pointsRight}</span>
+          <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/65 sm:text-[10px]">Points</span>
         </div>
       </header>
 
-      {/* Main Content Area */}
-      <main className="relative z-10 flex flex-col gap-8 my-auto max-w-6xl mx-auto w-full py-8">
-        {/* Question Prompt */}
-        <div className="bg-zinc-900/70 border border-zinc-800 rounded-2xl p-8 md:p-10 shadow-2xl backdrop-blur-sm">
-          <div className="flex items-center gap-2.5 text-amber-400 text-sm font-semibold tracking-wider uppercase mb-3 font-mono">
-            {questionType === 'CLUE_BASED' && <Search className="size-4" />}
-            {questionType === 'IMAGE_BASED' && <ImageIcon className="size-4" />}
-            {questionType === 'CONNECT' && <LinkIcon className="size-4" />}
-            {questionType === 'STANDARD' && <HelpCircle className="size-4" />}
-            <span>{questionType.replace('_', ' ')} QUESTION</span>
-          </div>
-          <h2 className="text-3xl md:text-5xl font-extrabold tracking-tight text-white leading-tight">
-            {prompt}
-          </h2>
-        </div>
+      <main className={`relative z-10 mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col justify-center ${preview ? 'gap-2 py-2' : 'gap-4 py-4 sm:gap-5 sm:py-5'}`}>
+        {revealedAnswer ? (
+          <div className="answer-reveal-enter flex min-h-0 flex-1 flex-col items-center gap-3 sm:gap-4">
+            <h2 className="shrink-0 text-center text-[clamp(1.35rem,2.5vw,2rem)] font-bold uppercase tracking-[0.16em] text-slate-500">Answer</h2>
+            {!displayMediaOnly && (
+              <section className="w-full shrink-0 rounded-2xl border border-slate-200/70 bg-white/70 px-5 py-3.5 text-center sm:px-8 sm:py-4.5">
+                <p className="mx-auto max-w-5xl whitespace-pre-wrap text-[clamp(.95rem,1.8vw,1.45rem)] font-medium leading-relaxed tracking-[-0.015em] text-slate-600">{prompt}</p>
+              </section>
+            )}
 
-        {/* Media (if image-based) */}
-        {media && (
-          <div className="flex justify-center w-full max-h-[380px] rounded-2xl overflow-hidden border border-zinc-800 bg-zinc-950/80 p-2 shadow-2xl">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={media}
-              alt="Question Visual"
-              className="object-contain max-h-[360px] w-auto rounded-xl mx-auto"
-            />
-          </div>
-        )}
+            <section className={`flex min-h-0 w-full ${finalAnswerImage ? 'shrink-0 py-5 sm:py-6' : 'flex-1 py-5 sm:py-7'} flex-col items-center justify-center overflow-hidden rounded-[2rem] border border-slate-200/80 bg-white/90 px-6 text-center shadow-[0_18px_60px_rgba(15,23,42,0.08)] sm:px-12`}>
+              <h2
+                className="mx-auto max-w-6xl whitespace-pre-wrap text-balance font-extrabold uppercase leading-[1.12] tracking-[-0.025em] text-slate-950"
+                style={{ fontSize: getAnswerFontSize(revealedAnswer.answer) }}
+              >
+                {revealedAnswer.answer}
+              </h2>
+            </section>
 
-        {/* Progressive Clues Section */}
-        {totalCluesCount > 0 && (
-          <div className="flex flex-col gap-3.5">
-            <div className="text-xs uppercase tracking-widest text-zinc-500 font-mono font-semibold">
-              Clues &amp; Insights ({revealedClues.length} of {totalCluesCount} Revealed)
-            </div>
-
-            <div className="grid gap-3.5 md:grid-cols-2">
-              {Array.from({ length: totalCluesCount }).map((_, idx) => {
-                const revealed = revealedClues.find((c) => c.index === idx);
-                const isRevealed = Boolean(revealed);
-
-                if (!isRevealed) {
-                  return (
-                    <div
-                      key={idx}
-                      className="flex items-center gap-3.5 p-4 rounded-xl border border-zinc-900 bg-zinc-950/50 text-zinc-600 transition-all"
-                    >
-                      <span className="size-7 rounded-lg bg-zinc-900 flex items-center justify-center font-mono text-xs font-semibold text-zinc-600">
-                        {idx + 1}
-                      </span>
-                      <span className="font-mono text-sm tracking-widest text-zinc-700">
-                        ••••••••••••••••••••••••••••••••
-                      </span>
-                    </div>
-                  );
-                }
-
-                return (
-                  <div
-                    key={idx}
-                    className="flex items-start gap-3.5 p-4 md:p-5 rounded-xl border border-amber-500/40 bg-gradient-to-r from-amber-950/30 via-zinc-900 to-zinc-900 text-zinc-100 shadow-lg shadow-amber-950/20 animate-in fade-in slide-in-from-bottom-2 duration-300"
-                  >
-                    <span className="size-7 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center font-mono text-xs font-bold text-amber-300 shrink-0 mt-0.5">
-                      {idx + 1}
-                    </span>
-                    <span className="text-lg md:text-xl font-medium leading-relaxed text-zinc-100">
-                      {revealed?.text}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Answer Reveal Banner */}
-        {revealedAnswer && (
-          <div className="relative overflow-hidden rounded-2xl border-2 border-emerald-500/60 bg-gradient-to-br from-emerald-950/60 via-zinc-900 to-zinc-950 p-8 md:p-10 shadow-[0_0_60px_rgba(16,185,129,0.25)] animate-in zoom-in-95 duration-500">
-            <div className="flex items-center gap-2.5 text-emerald-400 text-sm font-bold tracking-widest uppercase mb-2 font-mono">
-              <CheckCircle2 className="size-5" />
-              <span>Verified Answer</span>
-              <Sparkles className="size-4 animate-spin" style={{ animationDuration: '4s' }} />
-            </div>
-
-            <h3 className="text-3xl md:text-5xl font-black text-white tracking-tight leading-tight">
-              {revealedAnswer.answer}
-            </h3>
-
-            {revealedAnswer.explanation && (
-              <p className="mt-4 text-base md:text-lg text-emerald-200/80 font-normal border-t border-emerald-900/60 pt-4">
-                {revealedAnswer.explanation}
-              </p>
+            {finalAnswerImage && (
+              <div className={`flex ${preview ? 'h-[28%] min-h-[70px] max-h-[35%]' : 'h-[45vh] min-h-[220px] max-h-[520px]'} w-full shrink-0 items-center justify-center overflow-hidden rounded-[1.75rem] border border-slate-200/70 bg-white/90 p-2 shadow-[0_16px_48px_rgba(15,23,42,0.06)] sm:p-3`}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={finalAnswerImage} alt="Answer visual" className="h-full max-h-full w-full rounded-xl object-contain" />
+              </div>
             )}
           </div>
+        ) : (
+          <>
+            {!displayMediaOnly && (
+              <section className={`relative flex ${preview ? 'min-h-0 flex-1 px-4 py-3' : 'min-h-[34vh] flex-1 px-6 py-8 sm:px-12 sm:py-10'} flex-col items-center justify-center overflow-hidden rounded-[2rem] border border-white/90 bg-white/75 text-center shadow-[0_24px_90px_rgba(15,23,42,0.08)] ring-1 ring-slate-900/[0.035]`}>
+                <div className="mx-auto flex w-full min-w-0 max-w-6xl flex-col items-center">
+                  <h2
+                    className="w-full min-w-0 max-w-full whitespace-pre-wrap break-words text-balance font-extrabold leading-[1.08] tracking-[-0.045em] text-slate-950"
+                    style={{ fontSize: getPromptFontSize(prompt, preview) }}
+                  >
+                    {prompt.split(/\r?\n+/).filter((line) => line.length > 0).map((line, index) => (
+                      <React.Fragment key={`${index}-${line.slice(0, 16)}`}>
+                        {index > 0 && !compactPromptLineBreaks && <span aria-hidden="true" className="block h-[1em]" />}
+                        <span className="block">{line}</span>
+                      </React.Fragment>
+                    ))}
+                  </h2>
+                  {description && <p className={`max-w-4xl whitespace-pre-wrap break-words text-[clamp(1rem,2vw,1.45rem)] leading-relaxed text-slate-600 ${preview ? 'mt-2' : 'mt-5 sm:mt-7'}`}>{description}</p>}
+                </div>
+              </section>
+            )}
+
+            {media && (
+              <div className={`flex min-h-0 items-center justify-center overflow-hidden rounded-[1.75rem] border border-white/90 bg-white/85 p-2 shadow-[0_18px_60px_rgba(15,23,42,0.07)] sm:p-3 ${displayMediaOnly || preview ? 'flex-1' : 'max-h-[38vh]'} ${releaseYear ? 'flex-col' : ''}`}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={media}
+                  alt={displayMediaOnly ? 'Poster image' : 'Question visual'}
+                  className={`w-full rounded-xl object-contain ${releaseYear ? (displayMediaOnly || preview ? 'min-h-0 flex-1' : 'h-[calc(38vh-3rem)] max-h-full') : 'h-full max-h-full'}`}
+                />
+                {releaseYear && (
+                  <span className="mt-1 shrink-0 text-[clamp(1rem,2vw,1.45rem)] font-medium leading-relaxed text-slate-600">
+                    {releaseYear}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {revealedClues.length > 0 && (
+              <section aria-label="Revealed clues" className="grid max-h-[26vh] shrink-0 grid-cols-1 gap-2 overflow-hidden sm:grid-cols-2 sm:gap-3">
+                {revealedClues.map((clue) => (
+                  <div key={clue.index} className="flex min-h-0 items-start gap-3 rounded-2xl border border-amber-200 bg-[#fffaf0] px-4 py-3 text-slate-900 shadow-[0_8px_26px_rgba(120,80,0,0.06)] sm:px-5 sm:py-4">
+                    <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-amber-200/70 font-mono text-xs font-black text-amber-950">{clue.index + 1}</span>
+                    <span className="line-clamp-3 text-left text-sm font-medium leading-relaxed sm:text-base">{clue.text}</span>
+                  </div>
+                ))}
+              </section>
+            )}
+          </>
         )}
       </main>
-
-      {/* Footer safe status */}
-      <footer className="relative z-10 flex items-center justify-between border-t border-zinc-900 pt-5 text-xs font-mono text-zinc-500">
-        <div>DISPLAY SYNCHRONIZED</div>
-        <div>HOST CONTROLS CLUE PROGRESSION &amp; SCORING</div>
-      </footer>
     </div>
   );
 }

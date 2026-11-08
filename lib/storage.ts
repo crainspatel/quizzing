@@ -1,10 +1,11 @@
 import { get, set, del, keys } from 'idb-keyval';
-import { GameSession, Quiz, DisplayCommand } from '@/types/quiz';
+import { GameSession, Quiz, DisplayCommand, CurationPreset } from '@/types/quiz';
 
 const SESSION_KEY = 'kwizz_active_session_v2';
 const LAST_COMMAND_KEY = 'kwizz_last_display_command_v2';
 const SAVED_QUIZZES_PREFIX = 'kwizz_deck_';
 const MEDIA_PREFIX = 'kwizz_media_';
+const CURATION_PRESETS_KEY = 'kwizz_curation_presets_v1';
 
 // ─── LocalStorage (Synchronous Hot Snapshot) ───
 
@@ -36,6 +37,9 @@ export function clearSessionFromLocalStorage(): void {
 
 export function saveLastDisplayCommand(command: DisplayCommand): void {
   if (typeof window === 'undefined') return;
+  // Score/card updates change data on the current view; they should not replace
+  // the view snapshot used to restore that screen after a refresh.
+  if (command.type === 'UPDATE_SCORES' || command.type === 'DISABLE_CARD') return;
   try {
     localStorage.setItem(LAST_COMMAND_KEY, JSON.stringify(command));
   } catch (err) {
@@ -78,6 +82,15 @@ export async function listSavedQuizzes(): Promise<Quiz[]> {
 
 export async function deleteQuizFromIndexedDB(quizId: string): Promise<void> {
   await del(`${SAVED_QUIZZES_PREFIX}${quizId}`);
+}
+
+export async function loadCurationPresets(): Promise<CurationPreset[]> {
+  const presets = await get<CurationPreset[]>(CURATION_PRESETS_KEY);
+  return Array.isArray(presets) ? presets : [];
+}
+
+export async function saveCurationPresets(presets: CurationPreset[]): Promise<void> {
+  await set(CURATION_PRESETS_KEY, presets);
 }
 
 // Save media blob (e.g. data URL or base64) by filename

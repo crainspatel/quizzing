@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "node scripts/dev.mjs",
+    "generate:quiz": "node scripts/generate-default-quiz.mjs",
+    "prebuild": "npm run generate:quiz",
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint"
